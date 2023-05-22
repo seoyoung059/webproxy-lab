@@ -8,6 +8,7 @@
  */
 #include "csapp.h"
 
+void echo(int connfd);
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
 int parse_uri(char *uri, char *filename, char *cgiargs);
@@ -40,9 +41,23 @@ int main(int argc, char **argv) {
                 0);
     printf("Accepted connection from (%s, %s)\n", hostname, port);
     // performing a transaction
-    doit(connfd);   // line:netp:tiny:doit
+    // doit(connfd);   // line:netp:tiny:doit
+    echo(connfd);
     // closing its end of the connection
     Close(connfd);  // line:netp:tiny:close
+  }
+}
+
+void echo(int connfd)
+{
+  size_t n;
+  char buf[MAXLINE];
+  rio_t rio;
+
+  Rio_readinitb(&rio, connfd);
+  while ((n = Rio_readlineb(&rio, buf, MAXLINE))!=0){
+    printf("server received %d bytes\n", (int)n);
+    Rio_writen(connfd, buf, n);
   }
 }
 
@@ -56,12 +71,16 @@ void doit(int fd)
   char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
   char filename[MAXLINE], cgiargs[MAXLINE];
   rio_t rio;
+  int n;
 
   /* Read request line and headers */
   Rio_readinitb(&rio, fd);
-  Rio_readlineb(&rio, buf, MAXLINE);
+  n = Rio_readlineb(&rio, buf, MAXLINE);
   printf("Request headers:\n");
   printf("%s", buf);
+  // Rio_writen(fd, buf, n);
+  if (n!=0) printf("server received %d bytes\n\n", (int)n );
+
   sscanf(buf, "%s %s %s", method, uri, version);  // parse request lines
   // Supports only the GET method - if client requests another method, ERROR
   // send error message and return to the main routine
@@ -143,6 +162,7 @@ void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
 void read_requesthdrs(rio_t *rp)
 {
   char buf[MAXLINE];
+  int n;
 
   Rio_readlineb(rp, buf, MAXLINE);
   // check the empty text line (\r - carriage return, \n line feed)
