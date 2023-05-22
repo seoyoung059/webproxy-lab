@@ -12,9 +12,9 @@ void echo(int connfd);
 void doit(int fd);
 void read_requesthdrs(rio_t *rp);
 int parse_uri(char *uri, char *filename, char *cgiargs);
-void serve_static(int fd, char *filename, int filesize);
+void serve_static(int fd, char *filename, int filesize, char* method);
 void get_filetype(char *filename, char *filetype);
-void serve_dynamic(int fd, char *filename, char *cgiargs);
+void serve_dynamic(int fd, char *filename, char *cgiargs, char* method);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
                  char *longmsg);
 
@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
     printf("Accepted connection from (%s, %s)\n", hostname, port);
     // performing a transaction
     doit(connfd);   // line:netp:tiny:doit
-    echo(connfd);
+    // echo(connfd);
     // closing its end of the connection
     Close(connfd);  // line:netp:tiny:close
   }
@@ -85,7 +85,8 @@ void doit(int fd)
   // Supports only the GET method - if client requests another method, ERROR
   // send error message and return to the main routine
   // then closes the connection and await next connection request
-  if (strcasecmp(method, "GET")) {
+  // if (strcasecmp(method, "GET")) {
+  if (!(strcasecmp(method, "GET")==0 || strcasecmp(method, "HEAD")==0)){
     clienterror(fd, method, "501", "Not implemented",
                 "Tiny does not implement this method");
     return;
@@ -114,7 +115,7 @@ void doit(int fd)
       return;
     }
     // if it is executable, serve static content to the client
-    serve_static(fd, filename, sbuf.st_size);
+    serve_static(fd, filename, sbuf.st_size, method);
   }
   else {  /* Serve dynamic content */
   //verify if the file is executable
@@ -124,7 +125,7 @@ void doit(int fd)
       return;
     }
     // serve the dynamic content to the client
-    serve_dynamic(fd, filename, cgiargs);
+    serve_dynamic(fd, filename, cgiargs, method);
   }
 }
 
@@ -214,7 +215,7 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
 /*
  * serve_static - sends an HTTP response whose body contains the contents of a local file
  */
-void serve_static(int fd, char *filename, int filesize)
+void serve_static(int fd, char *filename, int filesize, char* method)
 {
   int srcfd;
   char *srcp, filetype[MAXLINE], buf[MAXBUF];
@@ -233,6 +234,8 @@ void serve_static(int fd, char *filename, int filesize)
   printf("%s",buf);
 
   /* send response body to client */
+  if (strcasecmp(method, "HEAD") == 0)
+    return;
   // opens filename for reading and get its file descriptor
   srcfd = Open(filename, O_RDONLY, 0);
   // Linux mmap function maps the requested file to a virtual memory area
@@ -275,7 +278,7 @@ void get_filetype(char *filename, char *filetype)
  * serve_dynamic - serve dynamic content by forking a child process and then
  *                 running a CGI program in the context of the child
  */
-void serve_dynamic(int fd, char *filename, char *cgiargs)
+void serve_dynamic(int fd, char *filename, char *cgiargs, char* method)
 {
   char buf[MAXLINE], *emptylist[]={NULL};
 
@@ -293,6 +296,7 @@ void serve_dynamic(int fd, char *filename, char *cgiargs)
     // initialize the QUERY_STRING environment variable with
     // the CGI arguemnts from the request URI
     setenv("QUERY_STRING", cgiargs, 1);
+    setenv("REQUEST_METHOD", method, 1);
     // redirects the child's standard output to the connected file descriptor
     Dup2(fd, STDOUT_FILENO);                /* redirect stdout to client */
     // loads and runs the CGI program
