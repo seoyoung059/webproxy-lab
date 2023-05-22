@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
                 0);
     printf("Accepted connection from (%s, %s)\n", hostname, port);
     // performing a transaction
-    // doit(connfd);   // line:netp:tiny:doit
+    doit(connfd);   // line:netp:tiny:doit
     echo(connfd);
     // closing its end of the connection
     Close(connfd);  // line:netp:tiny:close
@@ -238,7 +238,10 @@ void serve_static(int fd, char *filename, int filesize)
   // Linux mmap function maps the requested file to a virtual memory area
   //    *call to mmap maps the first filesize bytes of file srcfd to a private
   //     read-only area of virtual memory that starts at address srcp
-  srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
+  // srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
+  
+  srcp = Malloc(filesize);
+  Rio_readn(srcfd, srcp, filesize);
   // after mapping, don't need its descriptor
   // close the file - if fail, fatal memory leak
   Close(srcfd);
@@ -247,7 +250,8 @@ void serve_static(int fd, char *filename, int filesize)
   //    client connected descriptor
   Rio_writen(fd, srcp, filesize);
   // frees the mapped virtual memory area
-  Munmap(srcp, filesize);
+  // Munmap(srcp, filesize);
+  Free(srcp);
 }
 
 /*
